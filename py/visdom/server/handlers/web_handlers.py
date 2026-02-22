@@ -20,14 +20,6 @@ import jsonpatch
 import logging
 import math
 import os
-from collections import OrderedDict
-
-try:
-    # for after python 3.8
-    from collections.abc import Mapping, Sequence
-except ImportError:
-    # for python 3.7 and below
-    from collections import Mapping, Sequence
 
 import tornado.escape
 from visdom.utils.shared_utils import get_rand_id
