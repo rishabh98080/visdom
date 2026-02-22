@@ -273,7 +273,6 @@ const App = () => {
     ) {
       return;
     }
-    
     if (selection.envIDs.length > 1 && cmd.has_compare !== true) {
       sendEnvQuery(selection.envIDs);
     } else if (update) {
