@@ -18,7 +18,6 @@ import json
 import logging
 import os
 import time
-import types
 
 import tornado.ioloop
 import tornado.escape
