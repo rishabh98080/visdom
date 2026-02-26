@@ -1274,67 +1274,77 @@ class Visdom(object):
         _title2str(opts)
         _assert_opts(opts)
 
-        # ---- normalize image layout FIRST ----
+        # -------------------------------------------------
+        # Normalize input
+        # -------------------------------------------------
         img = np.asarray(img)
 
+        if img.size == 0:
+            raise ValueError("Visdom.image expects a non-empty image array.")
+
+        # Convert HWC -> CHW if needed
         if img.ndim == 3 and img.shape[-1] in (1, 3, 4):
             img = img.transpose(2, 0, 1)
 
-        if img.ndim == 2:
-            img = img[np.newaxis, :, :]
-
-        # ---- NOW dimensions are reliable ----
-        opts.setdefault("width", img.shape[-1])
-        opts.setdefault("height", img.shape[-2])
-
-        if np.issubdtype(img.dtype, np.floating):
-            if img.size > 0 and img.max() <= 1:
-                img = img * 255.0
-
-        img = np.clip(img, 0, 255).astype(np.uint8)
-
-        if img.ndim == 3 and img.shape[-1] in (1, 3, 4):
-            img = img.transpose(2, 0, 1)
-
+        # Convert grayscale HxW -> 1xHxW
         if img.ndim == 2:
             img = img[np.newaxis, :, :]
 
         if img.ndim != 3:
             raise ValueError(
-                f"Unsupported image dimensions after processing: "
-                f"img.shape={img.shape}, img.ndim={img.ndim}"
+                f"Unsupported image dimensions: img.shape={img.shape}, img.ndim={img.ndim}"
             )
 
+        # -------------------------------------------------
+        # Default display size
+        # -------------------------------------------------
+        opts.setdefault("width", img.shape[-1])
+        opts.setdefault("height", img.shape[-2])
+
+        # -------------------------------------------------
+        # Normalize dtype
+        # -------------------------------------------------
+        if np.issubdtype(img.dtype, np.floating):
+            if img.max() <= 1:
+                img = img * 255.0
+
+        img = np.clip(img, 0, 255).astype(np.uint8)
+
+        # -------------------------------------------------
+        # Channel handling
+        # -------------------------------------------------
         nchannels = img.shape[0]
 
         is_jpeg = "jpgquality" in opts
         if is_jpeg and opts["jpgquality"] is None:
             raise ValueError("jpgquality must be a valid integer when provided.")
 
+        # ---- Grayscale ----
         if nchannels == 1:
             rgb = np.repeat(img, 3, axis=0)
-
-            if not is_jpeg:
+            if is_jpeg:
+                img = rgb
+            else:
                 alpha = np.full((1, rgb.shape[1], rgb.shape[2]), 255, dtype=np.uint8)
                 img = np.concatenate([rgb, alpha], axis=0)
-            else:
-                img = rgb
 
+        # ---- RGB ----
         elif nchannels == 3:
             if not is_jpeg:
                 alpha = np.full((1, img.shape[1], img.shape[2]), 255, dtype=np.uint8)
                 img = np.concatenate([img, alpha], axis=0)
 
+        # ---- RGBA ----
         elif nchannels == 4:
             if is_jpeg:
-                img = img[:3, :, :]
+                img = img[:3, :, :]  # JPEG cannot store alpha
 
+        # ---- Invalid ----
         else:
             raise ValueError(
-                "Unsupported number of channels: {}. Expected 1, 3, or 4. "
-                "img.shape={}, img.ndim={}".format(nchannels, img.shape, img.ndim)
+                f"Unsupported number of channels: {nchannels}. "
+                f"Expected 1, 3, or 4. img.shape={img.shape}, img.ndim={img.ndim}"
             )
-    
         img = np.transpose(img, (1, 2, 0))
         im = Image.fromarray(img)
         buf = BytesIO()
